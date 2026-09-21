@@ -1,34 +1,32 @@
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
+
 import Navbar from "./components/Navbar";
+import Dashboard from "./pages/Dashboard";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import PredictionHistory from "./pages/PredictionHistory";
+import Account from "./pages/Account";
 
 function App() {
   return (
-    <div className="app-shell">
-      <Navbar />
+    <BrowserRouter>
+      <AuthProvider>
+        <div className="app-shell">
+          <Navbar />
 
-      <main className="page-container">
-        <section style={{ padding: "80px 0" }}>
-          <p style={{ color: "var(--accent-light)", fontWeight: 600 }}>
-            NIFTY 50 STOCK INTELLIGENCE
-          </p>
-
-          <h1 style={{ fontSize: "48px", margin: "12px 0" }}>
-            Predict the next market move.
-          </h1>
-
-          <p
-            style={{
-              maxWidth: "620px",
-              color: "var(--text-secondary)",
-              fontSize: "18px",
-              lineHeight: 1.7,
-            }}
-          >
-            Explore LSTM-based next closing price predictions for NIFTY 50
-            stocks through a simple and interactive dashboard.
-          </p>
-        </section>
-      </main>
-    </div>
+          <main className="page-container">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/history" element={<PredictionHistory />} />
+              <Route path="/account" element={<Account />} />
+            </Routes>
+          </main>
+        </div>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 
