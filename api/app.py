@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from tensorflow.keras.models import load_model
 
@@ -12,6 +13,23 @@ app = FastAPI(
     title="NIFTY 50 Stock Prediction API",
     description="LSTM based next stock price prediction API",
     version="1.0.0"
+)
+
+
+# Allow the public AI Studio frontend to call this FastAPI backend.
+# Localhost origins are also kept for local development/testing.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://nifty50-stock-prediction-lstm-ps1.ai.studio",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -171,10 +189,8 @@ def predict_stock(data: StockPredictionRequest):
         latest_data.mean()
     )
 
-    # The scaler was fitted using the 26 features plus Target.
-    # Target is included here only for scaling and is removed
-    # before sending the data to the LSTM model.
-
+    # Target is included only because the scaler
+    # was fitted using 26 features + Target.
     latest_data["Target"] = stock_data[
         "Target"
     ].tail(
