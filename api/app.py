@@ -16,12 +16,15 @@ app = FastAPI(
 )
 
 
-# Allow the public AI Studio frontend to call this FastAPI backend.
-# Localhost origins are also kept for local development/testing.
+# ---------------------------------------------------------
+# CORS
+# ---------------------------------------------------------
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://nifty50-stock-prediction-lstm-ps1.ai.studio",
+        "https://aistudio.google.com",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:8000",
@@ -33,10 +36,18 @@ app.add_middleware(
 )
 
 
+# ---------------------------------------------------------
+# Paths
+# ---------------------------------------------------------
+
 MODEL_PATH = "models/best_lstm_model.keras"
 SCALER_PATH = "models/scaler/per_stock_scalers.pkl"
 DATA_PATH = "data/processed/feature_engineered_stock_data.csv"
 
+
+# ---------------------------------------------------------
+# Model features
+# ---------------------------------------------------------
 
 FEATURE_COLUMNS = [
     "Adj Close",
@@ -64,7 +75,7 @@ FEATURE_COLUMNS = [
     "Close Lag 1",
     "Close Lag 2",
     "Close Lag 3",
-    "Close Lag 5"
+    "Close Lag 5",
 ]
 
 SCALER_COLUMNS = FEATURE_COLUMNS + ["Target"]
@@ -72,16 +83,16 @@ SCALER_COLUMNS = FEATURE_COLUMNS + ["Target"]
 SEQUENCE_LENGTH = 60
 
 
+# ---------------------------------------------------------
+# Load model and scalers
+# ---------------------------------------------------------
+
 model = None
 scalers = None
 
-
 try:
     model = load_model(MODEL_PATH)
-
-    scalers = joblib.load(
-        SCALER_PATH
-    )
+    scalers = joblib.load(SCALER_PATH)
 
     print("Model loaded successfully.")
     print("Scalers loaded successfully.")
@@ -91,24 +102,34 @@ except Exception as error:
     print(error)
 
 
+# ---------------------------------------------------------
+# Request model
+# ---------------------------------------------------------
+
 class StockPredictionRequest(BaseModel):
     stock_name: str
 
 
+# ---------------------------------------------------------
+# Home
+# ---------------------------------------------------------
+
 @app.get("/")
 def home():
-
     return {
         "message": "NIFTY 50 Stock Prediction API is running",
         "status": "success"
     }
 
 
+# ---------------------------------------------------------
+# Health
+# ---------------------------------------------------------
+
 @app.get("/health")
 def health():
 
     if model is None or scalers is None:
-
         return {
             "status": "unhealthy",
             "model_loaded": False,
@@ -122,63 +143,64 @@ def health():
     }
 
 
+# ---------------------------------------------------------
+# Prediction
+# ---------------------------------------------------------
+
 @app.post("/predict")
 def predict_stock(data: StockPredictionRequest):
 
     if model is None or scalers is None:
-
         raise HTTPException(
             status_code=500,
             detail="Model or scalers are not loaded."
         )
 
-    stock_name = data.stock_name.strip()
-
     if not os.path.exists(DATA_PATH):
-
         raise HTTPException(
             status_code=500,
             detail="Feature engineered dataset not found."
         )
 
+    stock_name = data.stock_name.strip()
+
     df = pd.read_csv(DATA_PATH)
 
-    df["Date"] = pd.to_datetime(
-        df["Date"]
+    df["Date"] = pd.to_datetime(df["Date"])
+
+    stock_data = (
+        df[df["Stock"] == stock_name]
+        .sort_values("Date")
+        .reset_index(drop=True)
     )
 
-    stock_data = df[
-        df["Stock"] == stock_name
-    ].sort_values(
-        "Date"
-    ).reset_index(drop=True)
-
     if stock_data.empty:
-
         raise HTTPException(
             status_code=404,
             detail=f"Stock '{stock_name}' not found."
         )
 
     if stock_name not in scalers:
-
         raise HTTPException(
             status_code=404,
             detail=f"No scaler found for stock '{stock_name}'."
         )
 
     if len(stock_data) < SEQUENCE_LENGTH:
-
         raise HTTPException(
             status_code=400,
             detail="Not enough historical data for prediction."
         )
 
-    latest_data = stock_data[
-        FEATURE_COLUMNS
-    ].tail(
-        SEQUENCE_LENGTH
-    ).copy()
+    # -----------------------------------------------------
+    # Prepare latest 60 rows for LSTM
+    # -----------------------------------------------------
+
+    latest_data = (
+        stock_data[FEATURE_COLUMNS]
+        .tail(SEQUENCE_LENGTH)
+        .copy()
+    )
 
     latest_data = latest_data.replace(
         [np.inf, -np.inf],
@@ -189,40 +211,27 @@ def predict_stock(data: StockPredictionRequest):
         latest_data.mean()
     )
 
-    # Target is included only because the scaler
-    # was fitted using 26 features + Target.
-    latest_data["Target"] = stock_data[
-        "Target"
-    ].tail(
-        SEQUENCE_LENGTH
-    ).values
+    latest_data["Target"] = (
+        stock_data["Target"]
+        .tail(SEQUENCE_LENGTH)
+        .values
+    )
 
-    latest_data = latest_data[
-        SCALER_COLUMNS
-    ]
+    latest_data = latest_data[SCALER_COLUMNS]
 
     scaler = scalers[stock_name]
 
-    scaled_full_data = scaler.transform(
-        latest_data
-    )
+    scaled_full_data = scaler.transform(latest_data)
 
-    target_index = SCALER_COLUMNS.index(
-        "Target"
-    )
+    target_index = SCALER_COLUMNS.index("Target")
 
     feature_indices = [
         index
-        for index in range(
-            len(SCALER_COLUMNS)
-        )
+        for index in range(len(SCALER_COLUMNS))
         if index != target_index
     ]
 
-    scaled_data = scaled_full_data[
-        :,
-        feature_indices
-    ]
+    scaled_data = scaled_full_data[:, feature_indices]
 
     X_input = scaled_data.reshape(
         1,
@@ -230,62 +239,92 @@ def predict_stock(data: StockPredictionRequest):
         len(FEATURE_COLUMNS)
     )
 
+    # -----------------------------------------------------
+    # Predict
+    # -----------------------------------------------------
+
     prediction_scaled = model.predict(
         X_input,
         verbose=0
     )[0][0]
 
-    target_mean = scaler.mean_[
-        target_index
-    ]
-
-    target_scale = scaler.scale_[
-        target_index
-    ]
+    target_mean = scaler.mean_[target_index]
+    target_scale = scaler.scale_[target_index]
 
     predicted_price = (
         prediction_scaled * target_scale
         + target_mean
     )
 
-    latest_date = stock_data[
-        "Date"
-    ].iloc[-1]
+    # -----------------------------------------------------
+    # Latest actual price
+    # -----------------------------------------------------
 
-    latest_close = stock_data[
-        "Close"
-    ].iloc[-1]
+    latest_date = stock_data["Date"].iloc[-1]
 
-    change = (
-        predicted_price
-        - latest_close
+    latest_close = float(
+        stock_data["Close"].iloc[-1]
     )
+
+    # -----------------------------------------------------
+    # Prediction change
+    # -----------------------------------------------------
+
+    change = predicted_price - latest_close
 
     percentage_change = (
         change / latest_close
     ) * 100
 
     if predicted_price > latest_close:
-
         direction = "UP"
-
     elif predicted_price < latest_close:
-
         direction = "DOWN"
-
     else:
-
         direction = "NO CHANGE"
+
+    # -----------------------------------------------------
+    # Real historical chart data
+    # -----------------------------------------------------
+
+    chart_history = (
+        stock_data[
+            ["Date", "Close"]
+        ]
+        .tail(30)
+        .copy()
+    )
+
+    chart_points = []
+
+    for _, row in chart_history.iterrows():
+
+        chart_points.append({
+            "date": row["Date"].strftime("%Y-%m-%d"),
+            "actual": round(float(row["Close"]), 2),
+            "predicted": None
+        })
+
+    # Next business day for prediction
+    next_date = (
+        latest_date
+        + pd.tseries.offsets.BDay(1)
+    )
+
+    chart_points.append({
+        "date": next_date.strftime("%Y-%m-%d"),
+        "actual": None,
+        "predicted": round(float(predicted_price), 2)
+    })
+
+    # -----------------------------------------------------
+    # API response
+    # -----------------------------------------------------
 
     return {
         "stock": stock_name,
-        "latest_date": str(
-            latest_date.date()
-        ),
-        "latest_close": round(
-            float(latest_close),
-            2
-        ),
+        "latest_date": str(latest_date.date()),
+        "latest_close": round(latest_close, 2),
         "predicted_next_price": round(
             float(predicted_price),
             2
@@ -298,5 +337,6 @@ def predict_stock(data: StockPredictionRequest):
             float(percentage_change),
             2
         ),
-        "prediction_direction": direction
+        "prediction_direction": direction,
+        "chart_points": chart_points
     }
