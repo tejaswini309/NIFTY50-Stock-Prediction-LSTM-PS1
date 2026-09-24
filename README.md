@@ -52,35 +52,53 @@ The raw stock datasets are stored in:
 
 ```text
 data/raw/NIFTY50_Datasets/
+```
 
+The processed datasets are stored in:
+
+```text
+data/processed/
+```
+
+Key processed files include:
+
+- `feature_engineered_stock_data.csv`
+- `train_data.csv`
+- `test_data.csv`
+
+### Data Source
+
+Historical market data was obtained from Yahoo Finance.
 
 ---
 
 ## Technology Stack
 
 ### Programming & Data Processing
+
 - Python
 - Pandas
 - NumPy
 - Scikit-learn
 
 ### Machine Learning & Deep Learning
+
 - TensorFlow
 - Keras
 - LSTM (Long Short-Term Memory)
 
 ### Data Analysis & Visualization
+
 - Matplotlib
 - Statsmodels
 
-### Data Source
-- Yahoo Finance historical market data
-
 ### Backend
+
 - FastAPI
 - Uvicorn
 
 ### Frontend
+
 - React
 - Vite
 - Axios
@@ -89,15 +107,15 @@ data/raw/NIFTY50_Datasets/
 - Lucide React
 
 ### Model Artifacts
+
 - Keras `.keras` model
 - Per-stock `StandardScaler` artifacts
 
 ### Development Tools
+
 - Visual Studio Code
 - Git
 - GitHub
-
-
 
 ---
 
@@ -123,7 +141,6 @@ The project follows a structured end-to-end machine learning workflow:
 16. FastAPI Backend Development
 17. Interactive Web Application
 18. Prediction and Future Improvement
-
 
 ---
 
@@ -189,7 +206,16 @@ Output Layer — 1 unit
      │
      ▼
 Predicted Next Closing Price
+```
 
+### Model Configuration
+
+- Optimizer: Adam
+- Loss Function: Mean Squared Error (MSE)
+- Evaluation Metrics: MAE
+- Lookback Window: 60 time steps
+- Input Features: 26
+- Output: Next closing price
 
 ---
 
@@ -206,11 +232,17 @@ The final LSTM model was evaluated on the chronological test dataset using stand
 
 The evaluation results are based on the final trained model and the held-out test data.
 
-The actual-versus-predicted results are available in:
+The model and preprocessing artifacts are stored in:
 
 ```text
-outputs/predictions/actual_vs_predicted.csv
+models/
+```
 
+Prediction outputs are stored in:
+
+```text
+outputs/predictions/
+```
 
 ---
 
@@ -226,12 +258,144 @@ The trained LSTM model is integrated into a FastAPI backend to provide predictio
 | GET | `/health` | Health check |
 | POST | `/predict` | Generate the next closing price prediction |
 
+### Prediction Request
+
 The prediction endpoint accepts a stock symbol:
 
 ```json
 {
   "stock_name": "RELIANCE.NS"
 }
+```
+
+### API Documentation
+
+Interactive Swagger API documentation is available at:
+
+https://nifty50-stock-prediction-lstm-ps1.onrender.com/docs
+
+### Backend Deployment
+
+The FastAPI backend is deployed using Render.
+
+---
+
+## Interactive Web Application
+
+The project includes an interactive web application that allows users to:
+
+- Select a NIFTY 50 stock.
+- Request the next closing price prediction.
+- View the latest closing price.
+- View the predicted next closing price.
+- View expected price change.
+- View prediction direction.
+- View historical and prediction chart information.
+- Store prediction history for authenticated users.
+
+The frontend is built using React and Vite.
+
+---
+
+## Model Prediction Flow
+
+The prediction workflow is:
+
+```text
+User Selects Stock
+        │
+        ▼
+Frontend Sends Stock Symbol
+        │
+        ▼
+FastAPI Prediction Endpoint
+        │
+        ▼
+Load Latest Historical Data
+        │
+        ▼
+Prepare Latest 60-Time-Step Sequence
+        │
+        ▼
+Apply Per-Stock Scaling
+        │
+        ▼
+LSTM Model Prediction
+        │
+        ▼
+Inverse Transform Prediction
+        │
+        ▼
+Return Predicted Closing Price
+        │
+        ▼
+Display Result in Web Application
+```
+
+---
+
+## Project Structure
+
+```text
+NIFTY50-Stock-Prediction-LSTM/
+│
+├── api/
+│   └── app.py
+│
+├── data/
+│   ├── raw/
+│   │   └── NIFTY50_Datasets/
+│   └── processed/
+│       ├── feature_engineered_stock_data.csv
+│       ├── train_data.csv
+│       └── test_data.csv
+│
+├── models/
+│   ├── best_lstm_model.keras
+│   └── scaler/
+│       ├── per_stock_scalers.pkl
+│       └── standard_scaler.pkl
+│
+├── notebooks/
+│
+├── outputs/
+│   ├── graphs/
+│   ├── predictions/
+│   └── training_history.csv
+│
+├── src/
+│   ├── data_loader.py
+│   ├── evaluate_model.py
+│   ├── evaluate_models.py
+│   ├── feature_selection.py
+│   ├── hyperparameter.py
+│   ├── lstm_preprocessing.py
+│   ├── model.py
+│   ├── predict.py
+│   ├── preprocessing.py
+│   ├── scaling.py
+│   ├── sequence_preparation.py
+│   ├── stationarity.py
+│   ├── train_model.py
+│   ├── train_models.py
+│   ├── train_test_split.py
+│   └── utils.py
+│
+├── frontend/
+│   ├── public/
+│   ├── src/
+│   ├── App.jsx
+│   ├── main.jsx
+│   ├── package.json
+│   ├── package-lock.json
+│   └── vite.config.js
+│
+├── main.py
+├── requirements.txt
+├── README.md
+├── .gitignore
+└── .gitattributes
+```
 
 ---
 
@@ -242,3 +406,123 @@ The prediction endpoint accepts a stock symbol:
 ```bash
 git clone https://github.com/tejaswini309/NIFTY50-Stock-Prediction-LSTM-PS1.git
 cd NIFTY50-Stock-Prediction-LSTM-PS1
+```
+
+### 2. Create a Python Virtual Environment
+
+```bash
+python -m venv .venv
+```
+
+Activate the environment on Windows:
+
+```bash
+.venv\Scriptsctivate
+```
+
+### 3. Install Python Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Run the FastAPI Backend
+
+```bash
+uvicorn api.app:app --reload
+```
+
+The local API will be available at:
+
+http://127.0.0.1:8000
+
+Swagger documentation:
+
+http://127.0.0.1:8000/docs
+
+### 5. Run the Frontend
+
+Open another terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The Vite development server will provide the local frontend URL in the terminal.
+
+---
+
+## Deployment
+
+### Backend
+
+The FastAPI backend is deployed on Render.
+
+Production API:
+
+https://nifty50-stock-prediction-lstm-ps1.onrender.com
+
+Swagger documentation:
+
+https://nifty50-stock-prediction-lstm-ps1.onrender.com/docs
+
+### Frontend
+
+The interactive frontend is deployed through Google AI Studio.
+
+Production application:
+
+https://nifty50-stock-prediction-lstm-ps1.ai.studio
+
+---
+
+## Important Model Files
+
+The main trained model is:
+
+```text
+models/best_lstm_model.keras
+```
+
+The per-stock preprocessing scalers are stored in:
+
+```text
+models/scaler/per_stock_scalers.pkl
+```
+
+These artifacts are required for prediction using the trained model.
+
+---
+
+## Limitations
+
+- Stock-market prices are influenced by many external factors that are not included in the model.
+- The model predicts the next closing price based on historical and engineered features.
+- Predictions should be treated as model outputs rather than guaranteed future prices.
+- Market behaviour can change over time, which may affect model performance.
+- The deployed backend may take additional time to respond after periods of inactivity because of the hosting environment.
+
+---
+
+## Future Improvements
+
+Potential future improvements include:
+
+- Incorporating broader market indicators.
+- Adding sentiment and news-based features.
+- Including macroeconomic variables.
+- Experimenting with GRU, Transformer, and hybrid architectures.
+- Performing automated hyperparameter optimization.
+- Adding scheduled model retraining.
+- Improving monitoring and model drift detection.
+- Expanding the prediction workflow with additional forecasting horizons.
+
+---
+
+## Conclusion
+
+This project demonstrates an end-to-end machine learning workflow for NIFTY 50 stock price prediction using LSTM-based time-series regression.
+
+It combines data preprocessing, feature engineering, sequential modelling, model evaluation, API development, deployment, and an interactive frontend into a complete application.
